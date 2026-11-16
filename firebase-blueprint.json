@@ -1,0 +1,543 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Non-PII workspace profile and RBAC role record for a registered member.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Member full name shown in workspace.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "companyName": {
+          "type": "string",
+          "description": "Organization or clinic group name.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "department": {
+          "type": "string",
+          "description": "Position or team label shown in assignee dropdown.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "enum": ["sales", "accounting", "super_admin"],
+          "description": "RBAC role controlling permissions."
+        },
+        "requestedRole": {
+          "type": "string",
+          "enum": ["sales", "accounting"],
+          "description": "Role requested by the user upon registration."
+        },
+        "approvalStatus": {
+          "type": "string",
+          "enum": ["pending", "approved", "suspended"],
+          "description": "Approval status managed by Super Admin."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": ["uid", "displayName", "companyName", "department", "role", "approvalStatus", "createdAt", "updatedAt"]
+    },
+    "UserPrivateInfo": {
+      "title": "UserPrivateInfo",
+      "description": "Isolated PII record for a registered member.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Member email address.",
+          "minLength": 3,
+          "maxLength": 180
+        },
+        "phone": {
+          "type": "string",
+          "description": "Optional phone number.",
+          "maxLength": 30
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": ["uid", "email", "updatedAt"]
+    },
+    "Contract": {
+      "title": "Contract",
+      "description": "Clinic AR, medical equipment, VAT/installment schedule, and collection contract record.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID of the creator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assignedRepUid": {
+          "type": "string",
+          "description": "UID of the assigned AR rep from users collection.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "contractCode": {
+          "type": "string",
+          "description": "Contract reference ID such as CNT-2026-001.",
+          "minLength": 2,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9\\-]+$"
+        },
+        "clinicName": {
+          "type": "string",
+          "description": "Clinic or branch name.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "parentClinicName": {
+          "type": "string",
+          "description": "Parent clinic group name for linking multiple branch contracts.",
+          "maxLength": 120
+        },
+        "contactPerson": {
+          "type": "string",
+          "description": "Primary customer contact person.",
+          "maxLength": 100
+        },
+        "contactPhone": {
+          "type": "string",
+          "description": "Customer contact phone number.",
+          "maxLength": 30
+        },
+        "taxId": {
+          "type": "string",
+          "description": "Company tax identification number.",
+          "maxLength": 20
+        },
+        "companyAddress": {
+          "type": "string",
+          "description": "Registered billing address.",
+          "maxLength": 300
+        },
+        "equipmentModel": {
+          "type": "string",
+          "description": "Medical equipment model name (e.g. Pico Laser, HIFU Ultramax 7D).",
+          "maxLength": 120
+        },
+        "serialNumber": {
+          "type": "string",
+          "description": "Medical equipment serial number.",
+          "maxLength": 80
+        },
+        "deliveryDate": {
+          "type": "string",
+          "description": "Equipment delivery date (YYYY-MM-DD).",
+          "maxLength": 20
+        },
+        "warrantyEndDate": {
+          "type": "string",
+          "description": "Equipment warranty end date (YYYY-MM-DD).",
+          "maxLength": 20
+        },
+        "region": {
+          "type": "string",
+          "enum": ["BKK", "North", "South", "Northeast", "East", "Central"],
+          "description": "Geographic region code."
+        },
+        "contractType": {
+          "type": "string",
+          "enum": ["ซื้อขาย", "เช่าซื้อ", "เช่า", "SaaS", "Hybrid", "Enterprise"],
+          "description": "Contract classification type."
+        },
+        "salesRep": {
+          "type": "string",
+          "description": "Formatted assigned AR representative label.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "creditGrade": {
+          "type": "string",
+          "enum": ["A+", "A", "AB", "B", "C", "D", "E", "F"],
+          "description": "Internal credit risk grade."
+        },
+        "includeVat": {
+          "type": "boolean",
+          "description": "Whether 7% VAT is included."
+        },
+        "amountBeforeVat": {
+          "type": "number",
+          "description": "Contract principal amount before 7% VAT in THB."
+        },
+        "vatAmount": {
+          "type": "number",
+          "description": "7% VAT amount in THB."
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "Total net contract amount incl. VAT in THB."
+        },
+        "downPayment": {
+          "type": "number",
+          "description": "Down payment amount in THB."
+        },
+        "securityDeposit": {
+          "type": "number",
+          "description": "Rental security deposit tracked separately from down payment and installments."
+        },
+        "totalInstallments": {
+          "type": "number",
+          "description": "Number of monthly installments (1-120)."
+        },
+        "monthlyInstallment": {
+          "type": "number",
+          "description": "Calculated monthly installment amount in THB."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Contract start date (YYYY-MM-DD).",
+          "minLength": 4,
+          "maxLength": 20
+        },
+        "penaltyRatePercent": {
+          "type": "number",
+          "description": "Monthly late penalty rate percent."
+        },
+        "waivedPenaltyAmount": {
+          "type": "number",
+          "description": "Late penalty amount waived by Super Admin."
+        },
+        "restructuredFromInstallment": {
+          "type": "number",
+          "description": "Installment number where debt restructuring takes effect."
+        },
+        "restructuredMonthlyAmount": {
+          "type": "number",
+          "description": "New monthly installment amount after restructuring."
+        },
+        "restructuredTotalInstallments": {
+          "type": "number",
+          "description": "New total installment count after extension."
+        },
+        "restructuredDate": {
+          "type": "string",
+          "description": "Date of debt restructuring (YYYY-MM-DD).",
+          "maxLength": 20
+        },
+        "scheduleVersion": {
+          "type": "number",
+          "description": "Version number of installment schedule."
+        },
+        "paidAmount": {
+          "type": "number",
+          "description": "Cumulative effective paid amount (cash + WHT) in THB."
+        },
+        "prepaidAmount": {
+          "type": "number",
+          "description": "Overpayment or unapplied credit balance in THB."
+        },
+        "notDueAmount": {
+          "type": "number",
+          "description": "Remaining balance not yet due in THB."
+        },
+        "dueThisMonthAmount": {
+          "type": "number",
+          "description": "Installment due within the current month in THB."
+        },
+        "overdueAmount": {
+          "type": "number",
+          "description": "Accumulated overdue principal balance in THB."
+        },
+        "lastPaymentDate": {
+          "type": "string",
+          "description": "Most recent active payment date (YYYY-MM-DD).",
+          "maxLength": 20
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "at_risk", "settled", "suspended"],
+          "description": "Current contract lifecycle status."
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "Next billing due date (YYYY-MM-DD).",
+          "minLength": 4,
+          "maxLength": 20
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional billing notes.",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "assignedRepUid",
+        "contractCode",
+        "clinicName",
+        "region",
+        "contractType",
+        "salesRep",
+        "creditGrade",
+        "includeVat",
+        "amountBeforeVat",
+        "vatAmount",
+        "totalAmount",
+        "downPayment",
+        "securityDeposit",
+        "totalInstallments",
+        "monthlyInstallment",
+        "startDate",
+        "penaltyRatePercent",
+        "waivedPenaltyAmount",
+        "scheduleVersion",
+        "paidAmount",
+        "prepaidAmount",
+        "notDueAmount",
+        "dueThisMonthAmount",
+        "overdueAmount",
+        "status",
+        "dueDate",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ContractRevision": {
+      "title": "ContractRevision",
+      "description": "Archived installment schedule snapshot prior to debt restructuring.",
+      "type": "object",
+      "properties": {
+        "contractId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "version": { "type": "number" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "previousTotalInstallments": { "type": "number" },
+        "previousMonthlyInstallment": { "type": "number" },
+        "previousStartDate": { "type": "string", "maxLength": 20 },
+        "newTotalInstallments": { "type": "number" },
+        "newMonthlyInstallment": { "type": "number" },
+        "restructuredFromInstallment": { "type": "number" },
+        "changedByUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "changedByName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "contractId",
+        "version",
+        "reason",
+        "previousTotalInstallments",
+        "previousMonthlyInstallment",
+        "previousStartDate",
+        "newTotalInstallments",
+        "newMonthlyInstallment",
+        "restructuredFromInstallment",
+        "changedByUid",
+        "changedByName",
+        "createdAt"
+      ]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment ledger transaction linked to a contract (editable/voidable only by Accounting or Super Admin).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "contractId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "contractAssignedRepUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "clinicName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "contractCode": { "type": "string", "minLength": 2, "maxLength": 32, "pattern": "^[a-zA-Z0-9\\-]+$" },
+        "actualCashAmount": { "type": "number", "description": "Cash transfer received." },
+        "whtRate": { "type": "number", "description": "Withholding tax percentage (0, 3, 5, etc.)." },
+        "whtAmount": { "type": "number", "description": "Withholding tax amount (50 ทวิ)." },
+        "amount": { "type": "number", "description": "Total debt-clearing credit (actualCashAmount + whtAmount)." },
+        "paymentType": { "type": "string", "enum": ["installment", "prepaid", "settlement"] },
+        "paymentMethod": { "type": "string", "enum": ["Bank Transfer", "PromptPay", "Credit Card", "Cheque"] },
+        "referenceNo": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "paidDate": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "hasAttachment": { "type": "boolean" },
+        "attachmentFileName": { "type": "string", "maxLength": 120 },
+        "isVoided": { "type": "boolean" },
+        "voidReason": { "type": "string", "maxLength": 300 },
+        "editReason": { "type": "string", "maxLength": 300 },
+        "note": { "type": "string", "maxLength": 300 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "contractId",
+        "contractAssignedRepUid",
+        "clinicName",
+        "contractCode",
+        "actualCashAmount",
+        "whtRate",
+        "whtAmount",
+        "amount",
+        "paymentType",
+        "paymentMethod",
+        "referenceNo",
+        "paidDate",
+        "hasAttachment",
+        "isVoided",
+        "createdAt"
+      ]
+    },
+    "PaymentAttachment": {
+      "title": "PaymentAttachment",
+      "description": "Transfer slip or WHT 50 ทวิ attachment stored separately from payment index docs.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "contractId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "contractAssignedRepUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "paymentId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fileName": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "mimeType": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "dataUrl": { "type": "string", "minLength": 10, "maxLength": 450000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "contractId", "contractAssignedRepUid", "paymentId", "fileName", "mimeType", "dataUrl", "createdAt"]
+    },
+    "CollectionLog": {
+      "title": "CollectionLog",
+      "description": "Collection follow-up and promise-to-pay CRM log linked to a contract.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "contractId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "assignedRepUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "contractCode": { "type": "string", "minLength": 2, "maxLength": 32, "pattern": "^[a-zA-Z0-9\\-]+$" },
+        "clinicName": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "contactDate": { "type": "string", "minLength": 4, "maxLength": 20 },
+        "contactPerson": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "channel": { "type": "string", "enum": ["โทรศัพท์", "LINE", "อีเมล", "เข้าพบหน้างาน"] },
+        "promiseToPayDate": { "type": "string", "maxLength": 20 },
+        "note": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "ownerId",
+        "authorName",
+        "contractId",
+        "assignedRepUid",
+        "contractCode",
+        "clinicName",
+        "contactDate",
+        "contactPerson",
+        "channel",
+        "note",
+        "createdAt"
+      ]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit trail recording mutations across contracts, payments, and user permissions.",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "actorRole": { "type": "string", "enum": ["sales", "accounting", "super_admin"] },
+        "action": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "targetType": { "type": "string", "enum": ["contract", "payment", "user", "system"] },
+        "targetId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "targetLabel": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "reason": { "type": "string", "maxLength": 300 },
+        "beforeSummary": { "type": "string", "maxLength": 600 },
+        "afterSummary": { "type": "string", "maxLength": 600 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorName", "actorRole", "action", "targetType", "targetId", "targetLabel", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Non-PII workspace profile and RBAC role for each registered user."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateInfo" },
+      "description": "Private PII subcollection isolated strictly to the user."
+    },
+    "/contracts/{contractId}": {
+      "schema": { "$ref": "#/entities/Contract" },
+      "description": "Clinic AR, medical equipment, VAT, installment, and penalty contracts."
+    },
+    "/contracts/{contractId}/revisions/{revisionId}": {
+      "schema": { "$ref": "#/entities/ContractRevision" },
+      "description": "Archived schedule revisions prior to debt restructuring."
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Payment ledger transactions linked to contracts."
+    },
+    "/paymentAttachments/{paymentId}": {
+      "schema": { "$ref": "#/entities/PaymentAttachment" },
+      "description": "Transfer slips and 50 ทวิ files associated with payment transactions."
+    },
+    "/collectionLogs/{logId}": {
+      "schema": { "$ref": "#/entities/CollectionLog" },
+      "description": "Debt collection follow-up logs and promise-to-pay records."
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable audit trail entries for system transparency."
+    }
+  }
+}

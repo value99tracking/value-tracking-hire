@@ -1,0 +1,6 @@
+{
+  "name": "Value E-billing — AR & Contract Hub",
+  "description": "Accounts receivable, clinic contract aging, credit grade analytics, and payment tracking hub powered by Firebase.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

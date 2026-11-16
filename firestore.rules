@@ -1,0 +1,496 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isBootstrappedAdminEmail() {
+      return isVerifiedUser() && request.auth.token.email == 'praphai33344@gmail.com';
+    }
+
+    function callerExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function callerData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isApprovedUser() {
+      return isBootstrappedAdminEmail()
+        || (isVerifiedUser()
+          && callerExists()
+          && callerData().approvalStatus == 'approved');
+    }
+
+    function isSuperAdmin() {
+      return isBootstrappedAdminEmail()
+        || (isApprovedUser() && callerData().role == 'super_admin');
+    }
+
+    function isAccountingOrAdmin() {
+      return isSuperAdmin()
+        || (isApprovedUser() && callerData().role in ['accounting', 'super_admin']);
+    }
+
+    // --- Entity Validation Helpers ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'companyName', 'department', 'role', 'approvalStatus', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'companyName', 'department', 'role', 'requestedRole', 'approvalStatus', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.companyName is string && data.companyName.size() >= 1 && data.companyName.size() <= 120
+        && data.department is string && data.department.size() >= 1 && data.department.size() <= 80
+        && data.role in ['sales', 'accounting', 'super_admin']
+        && (!('requestedRole' in data) || data.requestedRole in ['sales', 'accounting'])
+        && data.approvalStatus in ['pending', 'approved', 'suspended']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidInitialUserRole(data) {
+      return (
+        isBootstrappedAdminEmail()
+        && data.role == 'super_admin'
+        && data.approvalStatus == 'approved'
+      ) || (
+        data.role == 'sales'
+        && data.approvalStatus == 'pending'
+      );
+    }
+
+    function isValidUserPrivateInfo(data) {
+      return data.keys().hasAll(['uid', 'email', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'phone', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.uid == request.auth.uid
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 180
+        && (!('phone' in data) || (data.phone is string && data.phone.size() <= 30))
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidContract(data) {
+      return data.keys().hasAll([
+          'ownerId', 'assignedRepUid', 'contractCode', 'clinicName', 'region', 'contractType',
+          'salesRep', 'creditGrade', 'includeVat', 'amountBeforeVat', 'vatAmount', 'totalAmount',
+          'downPayment', 'securityDeposit', 'totalInstallments', 'monthlyInstallment', 'startDate',
+          'penaltyRatePercent', 'waivedPenaltyAmount', 'scheduleVersion',
+          'paidAmount', 'prepaidAmount', 'notDueAmount', 'dueThisMonthAmount', 'overdueAmount',
+          'status', 'dueDate', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'assignedRepUid', 'contractCode', 'clinicName', 'parentClinicName',
+          'contactPerson', 'contactPhone', 'taxId', 'companyAddress',
+          'equipmentModel', 'serialNumber', 'deliveryDate', 'warrantyEndDate',
+          'region', 'contractType', 'salesRep', 'creditGrade',
+          'includeVat', 'amountBeforeVat', 'vatAmount', 'totalAmount',
+          'downPayment', 'securityDeposit', 'totalInstallments', 'monthlyInstallment', 'startDate',
+          'penaltyRatePercent', 'waivedPenaltyAmount',
+          'restructuredFromInstallment', 'restructuredMonthlyAmount', 'restructuredTotalInstallments', 'restructuredDate',
+          'scheduleVersion',
+          'paidAmount', 'prepaidAmount', 'notDueAmount', 'dueThisMonthAmount', 'overdueAmount',
+          'lastPaymentDate', 'status', 'dueDate', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && isValidId(data.assignedRepUid)
+        && data.contractCode is string && data.contractCode.size() >= 2 && data.contractCode.size() <= 32 && data.contractCode.matches('^[a-zA-Z0-9\\-]+$')
+        && data.clinicName is string && data.clinicName.size() >= 2 && data.clinicName.size() <= 120
+        && (!('parentClinicName' in data) || (data.parentClinicName is string && data.parentClinicName.size() <= 120))
+        && (!('contactPerson' in data) || (data.contactPerson is string && data.contactPerson.size() <= 100))
+        && (!('contactPhone' in data) || (data.contactPhone is string && data.contactPhone.size() <= 30))
+        && (!('taxId' in data) || (data.taxId is string && data.taxId.size() <= 20))
+        && (!('companyAddress' in data) || (data.companyAddress is string && data.companyAddress.size() <= 300))
+        && (!('equipmentModel' in data) || (data.equipmentModel is string && data.equipmentModel.size() <= 120))
+        && (!('serialNumber' in data) || (data.serialNumber is string && data.serialNumber.size() <= 80))
+        && (!('deliveryDate' in data) || (data.deliveryDate is string && data.deliveryDate.size() <= 20))
+        && (!('warrantyEndDate' in data) || (data.warrantyEndDate is string && data.warrantyEndDate.size() <= 20))
+        && data.region in ['BKK', 'North', 'South', 'Northeast', 'East', 'Central']
+        && data.contractType in ['ซื้อขาย', 'เช่าซื้อ', 'เช่า', 'SaaS', 'Hybrid', 'Enterprise']
+        && data.salesRep is string && data.salesRep.size() >= 2 && data.salesRep.size() <= 120
+        && data.creditGrade in ['A+', 'A', 'AB', 'B', 'C', 'D', 'E', 'F']
+        && data.includeVat is bool
+        && data.amountBeforeVat is number && data.amountBeforeVat >= 0 && data.amountBeforeVat <= 1000000000
+        && data.vatAmount is number && data.vatAmount >= 0 && data.vatAmount <= 1000000000
+        && data.totalAmount is number && data.totalAmount >= 0 && data.totalAmount <= 1000000000
+        && data.downPayment is number && data.downPayment >= 0 && data.downPayment <= 1000000000
+        && data.securityDeposit is number && data.securityDeposit >= 0 && data.securityDeposit <= 1000000000
+        && data.totalInstallments is number && data.totalInstallments >= 1 && data.totalInstallments <= 120
+        && data.monthlyInstallment is number && data.monthlyInstallment >= 0 && data.monthlyInstallment <= 1000000000
+        && data.startDate is string && data.startDate.size() >= 4 && data.startDate.size() <= 20
+        && data.penaltyRatePercent is number && data.penaltyRatePercent >= 0 && data.penaltyRatePercent <= 50
+        && data.waivedPenaltyAmount is number && data.waivedPenaltyAmount >= 0 && data.waivedPenaltyAmount <= 1000000000
+        && (!('restructuredFromInstallment' in data) || (data.restructuredFromInstallment is number && data.restructuredFromInstallment >= 1 && data.restructuredFromInstallment <= 120))
+        && (!('restructuredMonthlyAmount' in data) || (data.restructuredMonthlyAmount is number && data.restructuredMonthlyAmount >= 0 && data.restructuredMonthlyAmount <= 1000000000))
+        && (!('restructuredTotalInstallments' in data) || (data.restructuredTotalInstallments is number && data.restructuredTotalInstallments >= 1 && data.restructuredTotalInstallments <= 120))
+        && (!('restructuredDate' in data) || (data.restructuredDate is string && data.restructuredDate.size() <= 20))
+        && data.scheduleVersion is number && data.scheduleVersion >= 1 && data.scheduleVersion <= 1000
+        && data.paidAmount is number && data.paidAmount >= 0 && data.paidAmount <= 1000000000
+        && data.prepaidAmount is number && data.prepaidAmount >= 0 && data.prepaidAmount <= 1000000000
+        && data.notDueAmount is number && data.notDueAmount >= 0 && data.notDueAmount <= 1000000000
+        && data.dueThisMonthAmount is number && data.dueThisMonthAmount >= 0 && data.dueThisMonthAmount <= 1000000000
+        && data.overdueAmount is number && data.overdueAmount >= 0 && data.overdueAmount <= 1000000000
+        && (!('lastPaymentDate' in data) || (data.lastPaymentDate is string && data.lastPaymentDate.size() <= 20))
+        && data.status in ['active', 'at_risk', 'settled', 'suspended']
+        && data.dueDate is string && data.dueDate.size() >= 4 && data.dueDate.size() <= 20
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 500))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidContractRevision(data) {
+      return data.keys().hasAll([
+          'contractId', 'version', 'reason', 'previousTotalInstallments', 'previousMonthlyInstallment',
+          'previousStartDate', 'newTotalInstallments', 'newMonthlyInstallment', 'restructuredFromInstallment',
+          'changedByUid', 'changedByName', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'contractId', 'version', 'reason', 'previousTotalInstallments', 'previousMonthlyInstallment',
+          'previousStartDate', 'newTotalInstallments', 'newMonthlyInstallment', 'restructuredFromInstallment',
+          'changedByUid', 'changedByName', 'createdAt'
+        ])
+        && isValidId(data.contractId)
+        && data.version is number && data.version >= 1 && data.version <= 1000
+        && data.reason is string && data.reason.size() >= 1 && data.reason.size() <= 300
+        && data.previousTotalInstallments is number && data.previousTotalInstallments >= 1 && data.previousTotalInstallments <= 120
+        && data.previousMonthlyInstallment is number && data.previousMonthlyInstallment >= 0 && data.previousMonthlyInstallment <= 1000000000
+        && data.previousStartDate is string && data.previousStartDate.size() <= 20
+        && data.newTotalInstallments is number && data.newTotalInstallments >= 1 && data.newTotalInstallments <= 120
+        && data.newMonthlyInstallment is number && data.newMonthlyInstallment >= 0 && data.newMonthlyInstallment <= 1000000000
+        && data.restructuredFromInstallment is number && data.restructuredFromInstallment >= 1 && data.restructuredFromInstallment <= 120
+        && isValidId(data.changedByUid)
+        && data.changedByUid == request.auth.uid
+        && data.changedByName is string && data.changedByName.size() >= 1 && data.changedByName.size() <= 100
+        && data.createdAt is timestamp;
+    }
+
+    function isValidPayment(data) {
+      return data.keys().hasAll([
+          'ownerId', 'contractId', 'contractAssignedRepUid', 'clinicName', 'contractCode',
+          'actualCashAmount', 'whtRate', 'whtAmount', 'amount',
+          'paymentType', 'paymentMethod', 'referenceNo', 'paidDate',
+          'hasAttachment', 'isVoided', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'contractId', 'contractAssignedRepUid', 'clinicName', 'contractCode',
+          'actualCashAmount', 'whtRate', 'whtAmount', 'amount',
+          'paymentType', 'paymentMethod', 'referenceNo', 'paidDate',
+          'hasAttachment', 'attachmentFileName', 'isVoided', 'voidReason', 'editReason',
+          'note', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && isValidId(data.contractId)
+        && isValidId(data.contractAssignedRepUid)
+        && data.clinicName is string && data.clinicName.size() >= 2 && data.clinicName.size() <= 120
+        && data.contractCode is string && data.contractCode.size() >= 2 && data.contractCode.size() <= 32 && data.contractCode.matches('^[a-zA-Z0-9\\-]+$')
+        && data.actualCashAmount is number && data.actualCashAmount >= 0 && data.actualCashAmount <= 1000000000
+        && data.whtRate is number && data.whtRate >= 0 && data.whtRate <= 15
+        && data.whtAmount is number && data.whtAmount >= 0 && data.whtAmount <= 1000000000
+        && data.amount is number && data.amount > 0 && data.amount <= 1000000000
+        && data.paymentType in ['installment', 'prepaid', 'settlement']
+        && data.paymentMethod in ['Bank Transfer', 'PromptPay', 'Credit Card', 'Cheque']
+        && data.referenceNo is string && data.referenceNo.size() >= 1 && data.referenceNo.size() <= 64
+        && data.paidDate is string && data.paidDate.size() >= 4 && data.paidDate.size() <= 20
+        && data.hasAttachment is bool
+        && (!('attachmentFileName' in data) || (data.attachmentFileName is string && data.attachmentFileName.size() <= 120))
+        && data.isVoided is bool
+        && (!('voidReason' in data) || (data.voidReason is string && data.voidReason.size() <= 300))
+        && (!('editReason' in data) || (data.editReason is string && data.editReason.size() <= 300))
+        && (!('note' in data) || (data.note is string && data.note.size() <= 300))
+        && data.createdAt is timestamp
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    function isValidPaymentAttachment(data) {
+      return data.keys().hasAll(['ownerId', 'contractId', 'contractAssignedRepUid', 'paymentId', 'fileName', 'mimeType', 'dataUrl', 'createdAt'])
+        && data.keys().hasOnly(['ownerId', 'contractId', 'contractAssignedRepUid', 'paymentId', 'fileName', 'mimeType', 'dataUrl', 'createdAt'])
+        && isValidId(data.ownerId)
+        && isValidId(data.contractId)
+        && isValidId(data.contractAssignedRepUid)
+        && isValidId(data.paymentId)
+        && data.fileName is string && data.fileName.size() >= 1 && data.fileName.size() <= 120
+        && data.mimeType is string && data.mimeType.size() >= 1 && data.mimeType.size() <= 80
+        && data.dataUrl is string && data.dataUrl.size() >= 10 && data.dataUrl.size() <= 450000
+        && data.createdAt is timestamp;
+    }
+
+    function isValidCollectionLog(data) {
+      return data.keys().hasAll([
+          'ownerId', 'authorName', 'contractId', 'assignedRepUid',
+          'contractCode', 'clinicName', 'contactDate', 'contactPerson', 'channel', 'note', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'authorName', 'contractId', 'assignedRepUid',
+          'contractCode', 'clinicName', 'contactDate', 'contactPerson', 'channel', 'promiseToPayDate', 'note', 'createdAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 100
+        && isValidId(data.contractId)
+        && isValidId(data.assignedRepUid)
+        && data.contractCode is string && data.contractCode.size() >= 2 && data.contractCode.size() <= 32
+        && data.clinicName is string && data.clinicName.size() >= 2 && data.clinicName.size() <= 120
+        && data.contactDate is string && data.contactDate.size() >= 4 && data.contactDate.size() <= 20
+        && data.contactPerson is string && data.contactPerson.size() >= 1 && data.contactPerson.size() <= 100
+        && data.channel in ['โทรศัพท์', 'LINE', 'อีเมล', 'เข้าพบหน้างาน']
+        && (!('promiseToPayDate' in data) || (data.promiseToPayDate is string && data.promiseToPayDate.size() <= 20))
+        && data.note is string && data.note.size() >= 1 && data.note.size() <= 500
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['actorUid', 'actorName', 'actorRole', 'action', 'targetType', 'targetId', 'targetLabel', 'createdAt'])
+        && data.keys().hasOnly(['actorUid', 'actorName', 'actorRole', 'action', 'targetType', 'targetId', 'targetLabel', 'reason', 'beforeSummary', 'afterSummary', 'createdAt'])
+        && isValidId(data.actorUid)
+        && data.actorUid == request.auth.uid
+        && data.actorName is string && data.actorName.size() >= 1 && data.actorName.size() <= 100
+        && data.actorRole in ['sales', 'accounting', 'super_admin']
+        && data.action is string && data.action.size() >= 2 && data.action.size() <= 60
+        && data.targetType in ['contract', 'payment', 'user', 'system']
+        && data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128
+        && data.targetLabel is string && data.targetLabel.size() >= 1 && data.targetLabel.size() <= 160
+        && (!('reason' in data) || (data.reason is string && data.reason.size() <= 300))
+        && (!('beforeSummary' in data) || (data.beforeSummary is string && data.beforeSummary.size() <= 600))
+        && (!('afterSummary' in data) || (data.afterSummary is string && data.afterSummary.size() <= 600))
+        && data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isVerifiedUser() && (isOwner(userId) || isApprovedUser() || isSuperAdmin());
+      allow list: if isVerifiedUser() && (isApprovedUser() || isSuperAdmin());
+
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == request.auth.uid
+        && isValidInitialUserRole(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'requestedRole', 'approvalStatus', 'displayName', 'companyName', 'department', 'updatedAt']))
+          ||
+          (!('role' in existing()) && isOwner(userId) && isValidInitialUserRole(incoming()) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'requestedRole', 'approvalStatus', 'displayName', 'companyName', 'department', 'updatedAt']))
+          ||
+          (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'companyName', 'department', 'updatedAt']))
+        );
+
+      allow delete: if false;
+
+      match /private/{docId} {
+        allow get: if isValidId(userId) && isValidId(docId) && docId == 'info' && isOwner(userId);
+        allow list: if false;
+        allow create: if isVerifiedUser()
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming())
+          && incoming().updatedAt == request.time;
+        allow update: if isVerifiedUser()
+          && isValidId(userId)
+          && isValidId(docId)
+          && docId == 'info'
+          && isOwner(userId)
+          && isValidUserPrivateInfo(incoming())
+          && incoming().uid == existing().uid
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly(['email', 'phone', 'updatedAt']);
+        allow delete: if false;
+      }
+    }
+
+    match /contracts/{contractId} {
+      allow get: if isValidId(contractId) && isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().assignedRepUid == request.auth.uid);
+
+      allow list: if isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().assignedRepUid == request.auth.uid);
+
+      allow create: if isApprovedUser()
+        && isValidId(contractId)
+        && isValidContract(incoming())
+        && incoming().ownerId == request.auth.uid
+        && (isAccountingOrAdmin() || incoming().assignedRepUid == request.auth.uid)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isApprovedUser()
+        && isValidId(contractId)
+        && isValidContract(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isSuperAdmin() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'assignedRepUid', 'contractCode', 'clinicName', 'parentClinicName', 'contactPerson', 'contactPhone',
+            'taxId', 'companyAddress', 'equipmentModel', 'serialNumber', 'deliveryDate', 'warrantyEndDate',
+            'region', 'contractType', 'salesRep', 'creditGrade',
+            'includeVat', 'amountBeforeVat', 'vatAmount', 'totalAmount', 'downPayment', 'securityDeposit',
+            'totalInstallments', 'monthlyInstallment', 'startDate', 'penaltyRatePercent', 'waivedPenaltyAmount',
+            'restructuredFromInstallment', 'restructuredMonthlyAmount', 'restructuredTotalInstallments', 'restructuredDate',
+            'scheduleVersion', 'paidAmount', 'prepaidAmount', 'notDueAmount', 'dueThisMonthAmount', 'overdueAmount',
+            'lastPaymentDate', 'status', 'dueDate', 'notes', 'updatedAt'
+          ]))
+          ||
+          (isAccountingOrAdmin() && incoming().diff(existing()).affectedKeys().hasOnly([
+            'assignedRepUid', 'contractCode', 'clinicName', 'parentClinicName', 'contactPerson', 'contactPhone',
+            'taxId', 'companyAddress', 'equipmentModel', 'serialNumber', 'deliveryDate', 'warrantyEndDate',
+            'region', 'contractType', 'salesRep', 'creditGrade',
+            'includeVat', 'amountBeforeVat', 'vatAmount', 'totalAmount', 'downPayment', 'securityDeposit',
+            'totalInstallments', 'monthlyInstallment', 'startDate', 'penaltyRatePercent', 'waivedPenaltyAmount',
+            'restructuredFromInstallment', 'restructuredMonthlyAmount', 'restructuredTotalInstallments', 'restructuredDate',
+            'scheduleVersion', 'paidAmount', 'prepaidAmount', 'notDueAmount', 'dueThisMonthAmount', 'overdueAmount',
+            'lastPaymentDate', 'status', 'dueDate', 'notes', 'updatedAt'
+          ]) && (
+            !('waivedPenaltyAmount' in existing())
+              ? incoming().waivedPenaltyAmount == 0
+              : incoming().waivedPenaltyAmount == existing().waivedPenaltyAmount
+          ))
+          ||
+          ((existing().ownerId == request.auth.uid || existing().assignedRepUid == request.auth.uid)
+            && existing().status != 'settled'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'parentClinicName', 'contactPerson', 'contactPhone', 'taxId', 'companyAddress',
+              'equipmentModel', 'serialNumber', 'deliveryDate', 'warrantyEndDate', 'notes', 'updatedAt'
+            ]))
+        );
+
+      allow delete: if isSuperAdmin() && isValidId(contractId);
+
+      match /revisions/{revisionId} {
+        allow get: if isValidId(contractId) && isValidId(revisionId) && isApprovedUser();
+        allow list: if isApprovedUser();
+        allow create: if isAccountingOrAdmin()
+          && isValidId(contractId)
+          && isValidId(revisionId)
+          && isValidContractRevision(incoming())
+          && incoming().contractId == contractId
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/contracts/$(contractId));
+        allow update: if false;
+        allow delete: if isSuperAdmin() && isValidId(contractId) && isValidId(revisionId);
+      }
+    }
+
+    match /payments/{paymentId} {
+      allow get: if isValidId(paymentId) && isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().contractAssignedRepUid == request.auth.uid);
+
+      allow list: if isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().contractAssignedRepUid == request.auth.uid);
+
+      allow create: if isAccountingOrAdmin()
+        && isValidId(paymentId)
+        && isValidPayment(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().isVoided == false
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/contracts/$(incoming().contractId))
+        && getAfter(/databases/$(database)/documents/contracts/$(incoming().contractId)).data.updatedAt == request.time;
+
+      allow update: if isAccountingOrAdmin()
+        && isValidId(paymentId)
+        && isValidPayment(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().contractId == existing().contractId
+        && incoming().contractAssignedRepUid == existing().contractAssignedRepUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/contracts/$(existing().contractId)).data.updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'actualCashAmount', 'whtRate', 'whtAmount', 'amount', 'paymentType',
+          'paymentMethod', 'referenceNo', 'paidDate', 'hasAttachment', 'attachmentFileName',
+          'isVoided', 'voidReason', 'editReason', 'note', 'updatedAt'
+        ]);
+
+      allow delete: if isSuperAdmin() && isValidId(paymentId);
+    }
+
+    match /paymentAttachments/{paymentId} {
+      allow get: if isValidId(paymentId) && isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().contractAssignedRepUid == request.auth.uid);
+      allow list: if false;
+      allow create: if isAccountingOrAdmin()
+        && isValidId(paymentId)
+        && isValidPaymentAttachment(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().paymentId == paymentId
+        && incoming().createdAt == request.time;
+      allow update: if isAccountingOrAdmin()
+        && isValidId(paymentId)
+        && isValidPaymentAttachment(incoming())
+        && incoming().ownerId == existing().ownerId
+        && incoming().contractId == existing().contractId
+        && incoming().contractAssignedRepUid == existing().contractAssignedRepUid
+        && incoming().paymentId == existing().paymentId
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['fileName', 'mimeType', 'dataUrl']);
+      allow delete: if isSuperAdmin() && isValidId(paymentId);
+    }
+
+    match /collectionLogs/{logId} {
+      allow get: if isValidId(logId) && isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().assignedRepUid == request.auth.uid);
+      allow list: if isApprovedUser()
+        && (isAccountingOrAdmin() || existing().ownerId == request.auth.uid || existing().assignedRepUid == request.auth.uid);
+      allow create: if isApprovedUser()
+        && isValidId(logId)
+        && isValidCollectionLog(incoming())
+        && incoming().createdAt == request.time
+        && exists(/databases/$(database)/documents/contracts/$(incoming().contractId));
+      allow update: if false;
+      allow delete: if isSuperAdmin() && isValidId(logId);
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && isApprovedUser()
+        && (isAccountingOrAdmin() || existing().actorUid == request.auth.uid);
+      allow list: if isApprovedUser()
+        && (isAccountingOrAdmin() || existing().actorUid == request.auth.uid);
+      allow create: if isVerifiedUser()
+        && isValidId(logId)
+        && isValidAuditLog(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isSuperAdmin() && isValidId(logId);
+    }
+  }
+}
