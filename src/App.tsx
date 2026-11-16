@@ -61,9 +61,15 @@ function WorkspaceApp() {
 
   const isBootstrappedAdmin =
     (user?.email || '').toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase();
+  const rawRole = profile?.role as string | undefined;
+  const isAdminRole =
+    isBootstrappedAdmin ||
+    rawRole === 'super_admin' ||
+    rawRole === 'admin' ||
+    rawRole === 'ผู้บริหาร';
   const isApproved =
-    isBootstrappedAdmin || profile?.approvalStatus === 'approved';
-  const effectiveRole = isBootstrappedAdmin
+    isAdminRole || profile?.approvalStatus === 'approved';
+  const effectiveRole = isAdminRole
     ? 'super_admin'
     : profile?.role || 'sales';
 

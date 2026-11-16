@@ -181,9 +181,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    const rawRole = profile.role as string | undefined;
     const canListDirectory =
       profile.approvalStatus === 'approved' ||
-      profile.role === 'super_admin' ||
+      rawRole === 'super_admin' ||
+      rawRole === 'admin' ||
+      rawRole === 'ผู้บริหาร' ||
       (user.email || '').toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase();
 
     if (!canListDirectory) {

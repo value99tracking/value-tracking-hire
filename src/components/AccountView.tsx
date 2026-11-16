@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   Database,
@@ -9,6 +10,7 @@ import {
   ShieldCheck,
   User,
   Users,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -65,6 +67,7 @@ export function AccountView({
   const [updatingUid, setUpdatingUid] = useState<string | null>(null);
   const [roleDrafts, setRoleDrafts] = useState<Record<string, UserRole>>({});
   const [statusDrafts, setStatusDrafts] = useState<Record<string, ApprovalStatus>>({});
+  const [roleNotice, setRoleNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -86,7 +89,18 @@ export function AccountView({
     setStatusDrafts(sMap);
   }, [usersDirectory]);
 
-  const isSuperAdmin = profile?.role === 'super_admin';
+  const rawRole = profile?.role as string | undefined;
+  const isSuperAdmin =
+    actor.role === 'super_admin' ||
+    rawRole === 'super_admin' ||
+    rawRole === 'admin' ||
+    rawRole === 'ผู้บริหาร';
+
+  useEffect(() => {
+    if (!roleNotice) return;
+    const timer = setTimeout(() => setRoleNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [roleNotice]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -114,13 +128,21 @@ export function AccountView({
     setUpdatingUid(target.uid);
     setErrorMsg('');
     setSavedMsg('');
+    setRoleNotice(null);
     try {
       const nextRole = roleDrafts[target.uid] || target.role;
       const nextStatus = statusDrafts[target.uid] || target.approvalStatus;
       await updateUserRoleAndApproval(actor, target, nextRole, nextStatus);
-      setSavedMsg(`อัปเดตสิทธิ์ของ ${target.displayName} เรียบร้อยแล้ว`);
+      const msg = `อัปเดตสิทธิ์ (${ROLE_LABELS_TH[nextRole]}) และสถานะ (${APPROVAL_STATUS_LABELS_TH[nextStatus]}) ของ ${target.displayName} เรียบร้อยแล้ว`;
+      setSavedMsg(msg);
+      setRoleNotice({ type: 'success', message: msg });
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'ไม่สามารถอัปเดตสิทธิ์ผู้ใช้งานได้');
+      const msg =
+        err instanceof Error
+          ? `อัปเดตสิทธิ์ไม่สำเร็จ: ${err.message}`
+          : 'ไม่สามารถอัปเดตสิทธิ์ผู้ใช้งานได้';
+      setErrorMsg(msg);
+      setRoleNotice({ type: 'error', message: msg });
     } finally {
       setUpdatingUid(null);
     }
@@ -301,6 +323,33 @@ export function AccountView({
             </div>
           </div>
 
+          {roleNotice && (
+            <div
+              className={`mx-6 mt-4 p-3 rounded-xl border text-xs flex items-center justify-between gap-2 ${
+                roleNotice.type === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-rose-50 border-rose-200 text-rose-700'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                {roleNotice.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                )}
+                <span className="break-words">{roleNotice.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleNotice(null)}
+                className="p-1 rounded hover:bg-black/5 shrink-0 cursor-pointer"
+                aria-label="ปิดการแจ้งเตือน"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -472,6 +521,32 @@ export function AccountView({
           </button>
         </div>
       </div>
+
+      {roleNotice && (
+        <div
+          role="status"
+          className={`fixed bottom-5 right-5 z-50 max-w-sm shadow-lg rounded-xl border px-4 py-3 text-xs flex items-center gap-2.5 ${
+            roleNotice.type === 'success'
+              ? 'bg-emerald-600 border-emerald-700 text-white'
+              : 'bg-rose-600 border-rose-700 text-white'
+          }`}
+        >
+          {roleNotice.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 shrink-0" />
+          )}
+          <span className="flex-1 font-medium break-words">{roleNotice.message}</span>
+          <button
+            type="button"
+            onClick={() => setRoleNotice(null)}
+            className="p-0.5 rounded hover:bg-white/15 shrink-0 cursor-pointer"
+            aria-label="ปิดการแจ้งเตือน"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
